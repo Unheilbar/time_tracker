@@ -71,7 +71,6 @@ func (bdb *BadgerDB) Get(namespace, key []byte) (value []byte, err error) {
 		if err != nil {
 			return err
 		}
-
 		tmpValue, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -98,6 +97,20 @@ func (bdb *BadgerDB) Set(namespace, key, value []byte) error {
 	err := bdb.db.Update(func(txn *badger.Txn) error {
 		key := badgerNamespaceKey(namespace, key)
 		return txn.Set(key, value)
+	})
+
+	if err != nil {
+		log.Fatalf("failed to set key %s for namespace %s: %v", key, namespace, err)
+		return err
+	}
+
+	return nil
+}
+
+func (bdb *BadgerDB) Remove(namespace, key []byte) error {
+	err := bdb.db.Update(func(txn *badger.Txn) error {
+		key := badgerNamespaceKey(namespace, key)
+		return txn.Delete((key))
 	})
 
 	if err != nil {

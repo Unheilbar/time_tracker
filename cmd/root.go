@@ -16,15 +16,15 @@ var rootCmd = &cobra.Command{
 	Run: tracker.Root,
 }
 
-var createCmd = &cobra.Command{
-	Use:   "create",
+var startCmd = &cobra.Command{
+	Use:   "start",
 	Short: "Start starts timer for task",
-	Run:   tracker.Create,
+	Run:   tracker.Start,
 }
 
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop stops timer for task",
+	Short: "Stop stops timer for active task",
 	Run:   tracker.Stop,
 }
 
@@ -36,14 +36,14 @@ var listCmd = &cobra.Command{
 
 var resumeCmd = &cobra.Command{
 	Use:   "resume",
-	Short: "Runs last stopped task",
+	Short: "Runs last idled task",
 	Run:   tracker.Resume,
 }
 
-var afkCmd = &cobra.Command{
-	Use:   "afk",
+var removeCmd = &cobra.Command{
+	Use:   "remove",
 	Short: "Stops last activated task",
-	Run:   tracker.AFK,
+	Run:   tracker.Remove,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -56,36 +56,30 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(resumeCmd)
 
 	// create flags
 	// TODO move them to internal
-	createCmd.Flags().StringP(
+	startCmd.Flags().StringP(
 		"task",
 		"t",
 		"",
 		`
-		name of the task to create
-		`)
-	createCmd.Flags().StringSliceP(
-		"description",
-		"d",
-		nil,
-		`
-		description of current task session
-		if not provided is empty
-		actual shortland is -desc because of bug in cobra library
+		name of the task to start
 		`)
 
-	createCmd.MarkFlagsOneRequired("task")
+	startCmd.MarkFlagsOneRequired("task")
 
-	stopCmd.Flags().StringP(
+	removeCmd.Flags().StringP(
 		"task",
 		"t",
 		"",
 		`
-		name of the task to stop
+		name of the task to remove
 		`)
+	removeCmd.MarkFlagsOneRequired("task")
 }
