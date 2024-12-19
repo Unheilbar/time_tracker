@@ -88,7 +88,6 @@ func getActiveTaskTitle() (string, error) {
 		return "", err
 	}
 	return string(title), nil
-
 }
 
 func removeTask(title string) error {

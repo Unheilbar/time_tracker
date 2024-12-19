@@ -41,20 +41,17 @@ type Task struct {
 	Status        taskStatus
 	Created       time.Time
 	Stopped       time.Time
+	Started       time.Time
 	TotalDuration time.Duration
 	Tags          []string
 }
 
-func (t Task) currentSession() string {
+func (t Task) currentSession() time.Duration {
 	if t.Status != statusActive {
-		return ""
+		return 0
 	}
 
-	if t.Stopped.Unix() < 0 {
-		return time.Since(t.Created).Truncate(time.Second).String()
-	}
-
-	return time.Since(t.Stopped).Truncate(time.Second).String()
+	return time.Since(t.Started).Truncate(time.Second)
 }
 
 func (t Task) stopped() string {

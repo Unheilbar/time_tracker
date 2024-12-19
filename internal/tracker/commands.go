@@ -25,9 +25,10 @@ func Root(cmd *cobra.Command, args []string) {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Total Duration", "Session Duration", "Status"})
+	t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
 	t.AppendSeparator()
-	t.AppendRow([]interface{}{task.Title, task.Created.Truncate(time.Second).Format(time.DateTime), task.stopped(), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
+	t.AppendRow([]interface{}{task.Title, task.Created.Truncate(time.Second).Format(time.DateTime), task.stopped(),
+		task.Started.Truncate(time.Second).Format(time.DateTime), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
 	t.Render()
 }
 
@@ -39,6 +40,9 @@ func Start(cmd *cobra.Command, args []string) {
 		log.Fatalf("Can't get current active task title %s", err)
 	}
 
+	if taskTitle == activeTitle {
+		return
+	}
 	err = stopTask(activeTitle)
 	if err != nil {
 		log.Fatalf("Can't stop active task %s", err)
@@ -90,10 +94,10 @@ func List(cmd *cobra.Command, args []string) {
 	}
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"#", "Title", "Created", "Stopped", "Total Duration", "Session Duration", "Status"})
+	t.AppendHeader(table.Row{"#", "Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
 	t.AppendSeparator()
 	for idx, task := range tasks {
-		t.AppendRow([]interface{}{idx, task.Title, task.Created.Format(time.DateTime), task.stopped(), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
+		t.AppendRow([]interface{}{idx, task.Title, task.Created.Format(time.DateTime), task.stopped(), task.Started.Format(time.DateTime), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
 		t.AppendSeparator()
 	}
 	t.Render()
@@ -113,11 +117,14 @@ func startTask(t string) error {
 		return saveTask(Task{
 			Status:  statusActive,
 			Created: time.Now(),
+			Started: time.Now(),
 			Title:   t,
 		})
 	}
 
 	task.Status = statusActive
+	task.Started = time.Now()
+
 	return saveTask(task)
 }
 
@@ -130,7 +137,7 @@ func stopTask(t string) error {
 		return nil
 	}
 
-	task.TotalDuration += time.Since(task.Created)
+	task.TotalDuration += task.currentSession()
 	task.Stopped = time.Now()
 	task.Status = statusStopped
 
