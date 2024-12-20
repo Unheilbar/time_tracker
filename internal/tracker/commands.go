@@ -1,145 +1,162 @@
 package tracker
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"time"
+	"strings"
 
+	"github.com/Unheilbar/time_tracker/internal/entities"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 )
 
 var noTaskMsg = "No tasks yet. Add your first one with command start"
 
-// Root prints active task or provides usage info
-func Root(cmd *cobra.Command, args []string) {
-	task, err := getActiveTask()
-	if err != nil {
-		log.Fatalf("Can't recieve active task %s", err)
+type Repository interface {
+	LoadList() (*entities.EntriesLists, error)
+	DumpList(*entities.EntriesLists) error
+}
+
+type App struct {
+	repo Repository
+}
+
+func NewApp(repo Repository) *App {
+	return &App{
+		repo: repo,
 	}
-	if task.Status == statusNaN {
-		log.Println(noTaskMsg)
+}
+
+// Root prints active task or provides usage info
+func (a *App) Root(cmd *cobra.Command, args []string) {
+	list, err := a.repo.LoadList()
+	if err != nil {
+		log.Fatal("failed to upload list from db", err)
+	}
+
+	activeTitle := list.CurrentActive
+	lastActive := list.LastActive
+	if activeTitle == "" {
+		log.Println("No tasks are running. Run a task with start [taskname] command")
+		if lastActive != "" {
+			// display last active
+		}
 		return
 	}
 
+	// yet to implement
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
 	t.AppendSeparator()
-	t.AppendRow([]interface{}{task.Title, task.Created.Truncate(time.Second).Format(time.DateTime), task.stopped(),
-		task.Started.Truncate(time.Second).Format(time.DateTime), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
+	t.AppendRow(list.EntriesListsView[activeTitle].AggregateAllRows())
 	t.Render()
 }
 
-func Start(cmd *cobra.Command, args []string) {
-	taskTitle := cmd.Flag("task").Value.String()
-
-	activeTitle, err := getActiveTaskTitle()
-	if err != nil {
-		log.Fatalf("Can't get current active task title %s", err)
+func (a *App) Start(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		log.Fatal("Provide task title")
 	}
 
-	if taskTitle == activeTitle {
-		return
-	}
-	err = stopTask(activeTitle)
+	title := getTitleByArgs(args)
+
+	list, err := a.repo.LoadList()
 	if err != nil {
-		log.Fatalf("Can't stop active task %s", err)
+		log.Fatal("failed to upload list from db", err)
 	}
 
-	startTask(taskTitle)
+	list.InsertEntry(title, entities.StatusActive)
+
+	err = a.repo.DumpList(list)
 	if err != nil {
-		log.Fatalf("Can't start task %s", err)
+		log.Fatal("failed to save list to db ", err)
 	}
 
 }
 
-func Remove(cmd *cobra.Command, args []string) {
-	taskTitle := cmd.Flag("task").Value.String()
+func (a *App) Stop(cmd *cobra.Command, args []string) {
+	list, err := a.repo.LoadList()
+	if err != nil {
+		log.Fatal("failed to upload list from db")
+	}
 
-	if err := removeTask(taskTitle); err != nil {
-		log.Fatal(err)
+	title := list.CurrentActive
+
+	list.InsertEntry(title, entities.StatusStop)
+
+	err = a.repo.DumpList(list)
+	if err != nil {
+		log.Fatal("failed to save list to db")
 	}
 }
 
-func Resume(cmd *cobra.Command, args []string) {
-	title, err := getActiveTaskTitle()
+func (a *App) Remove(cmd *cobra.Command, args []string) {
+	title := getTitleByArgs(args)
+
+	list, err := a.repo.LoadList()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to upload list from db")
 	}
-	startTask(title)
+
+	if title != "" {
+		list.RemoveByTitle(title)
+	}
+
+	isAll := cmd.Flags().Lookup("all").Changed
+	if isAll {
+		list.RemoveAll()
+	}
+
+	a.repo.DumpList(list)
+
 }
 
-func Stop(cmd *cobra.Command, args []string) {
-	title, err := getActiveTaskTitle()
+func (a *App) Resume(cmd *cobra.Command, args []string) {
+	list, err := a.repo.LoadList()
 	if err != nil {
-		log.Fatalf("Can't get active task title %s", title)
+		log.Fatal("failed to upload list from db")
 	}
 
-	err = stopTask(title)
+	title := list.CurrentActive
+	if title == "" {
+		title = list.LastActive
+	}
+
+	list.InsertEntry(title, entities.StatusActive)
+
+	err = a.repo.DumpList(list)
 	if err != nil {
-		log.Fatalf("Can't stop task %s", err)
+		log.Fatal("failed to save list to db")
 	}
 }
 
-func List(cmd *cobra.Command, args []string) {
-	tasks, err := getAll()
-	if len(tasks) == 0 {
-		fmt.Println(noTaskMsg)
-		return
-	}
+func (a *App) List(cmd *cobra.Command, args []string) {
+	list, err := a.repo.LoadList()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to upload list from db")
 	}
+
+	renderAggregatedAll(list)
+}
+
+func getTitleByArgs(args []string) entities.ListTitle {
+	return entities.ListTitle(strings.Join(args, " "))
+}
+
+func renderAggregatedAll(list *entities.EntriesLists) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"#", "Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
+	t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
 	t.AppendSeparator()
-	for idx, task := range tasks {
-		t.AppendRow([]interface{}{idx, task.Title, task.Created.Format(time.DateTime), task.stopped(), task.Started.Format(time.DateTime), task.TotalDuration.Truncate(time.Second), task.currentSession(), task.Status})
-		t.AppendSeparator()
+	for title, entries := range list.EntriesListsView {
+		if title != list.CurrentActive {
+			t.AppendRow(entries.AggregateAllRows())
+			t.AppendSeparator()
+		}
 	}
+	if list.CurrentActive != "" {
+		t.AppendRow(list.EntriesListsView[list.CurrentActive].AggregateAllRows())
+	}
+
 	t.Render()
-}
-func startTask(t string) error {
-	err := updateActiveTaskTitle(t)
-	if err != nil {
-		return err
-	}
-
-	task, err := getTask(t)
-	if err != nil {
-		return err
-	}
-
-	if task.Status == statusNaN {
-		return saveTask(Task{
-			Status:  statusActive,
-			Created: time.Now(),
-			Started: time.Now(),
-			Title:   t,
-		})
-	}
-
-	task.Status = statusActive
-	task.Started = time.Now()
-
-	return saveTask(task)
-}
-
-func stopTask(t string) error {
-	task, err := getTask(t)
-	if err != nil {
-		return err
-	}
-	if task.Status == statusNaN {
-		return nil
-	}
-
-	task.TotalDuration += task.currentSession()
-	task.Stopped = time.Now()
-	task.Status = statusStopped
-
-	return saveTask(task)
 }

@@ -1,4 +1,4 @@
-package tracker
+package repository
 
 import (
 	"context"
@@ -71,6 +71,7 @@ func (bdb *BadgerDB) Get(namespace, key []byte) (value []byte, err error) {
 		if err != nil {
 			return err
 		}
+
 		tmpValue, err := item.ValueCopy(nil)
 		if err != nil {
 			return err
@@ -143,6 +144,7 @@ func (bdb *BadgerDB) All(namespace, prefix []byte) (vals [][]byte, err error) {
 		opts.Prefix = badgerNamespaceKey(namespace, prefix)
 		it := txn.NewIterator(opts)
 		defer it.Close()
+
 		for it.Rewind(); it.Valid(); it.Next() {
 			var val []byte
 
