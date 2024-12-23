@@ -1,21 +1,122 @@
 package entities
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
-
-// /  active -> ptr entries list active
-// /
-// /
-type ListTitle string
 
 type EntriesLists struct {
 	// The title of currently active lists
 	CurrentActive    ListTitle
 	LastActive       ListTitle
 	EntriesListsView map[ListTitle]*List
+	Tags             TagsView
 }
+
+func (elist *EntriesLists) AddTag(tag Tag, title ListTitle) error {
+	list, ok := elist.EntriesListsView[title]
+	if !ok {
+		return errors.New("title doesn't exist")
+	}
+
+	list.Tags = append(list.Tags, tag)
+	elist.Tags.View[tag] = append(elist.Tags.View[tag], title)
+
+	return nil
+
+}
+
+func (elist *EntriesLists) RemoveTag(tag Tag) {
+	for _, title := range elist.Tags.View[tag] {
+		elist.EntriesListsView[title].RemoveTag(tag)
+	}
+
+	delete(elist.Tags.View, tag)
+}
+
+func (elist *EntriesLists) Lists() []*List {
+	var lists []*List
+
+	for _, list := range elist.EntriesListsView {
+		lists = append(lists, list)
+	}
+
+	return lists
+}
+
+type Filter func(*List, []Tag) bool
+
+func (elist *EntriesLists) Filter(tags []Tag, ok Filter) []*List {
+	if len(tags) == 0 {
+		return elist.Lists()
+	}
+	var lists []*List
+
+	for _, tag := range tags {
+		for _, title := range elist.Tags.View[tag] {
+			list := elist.EntriesListsView[title]
+			if ok(list, tags) {
+				lists = append(lists, list)
+			}
+		}
+	}
+
+	return lists
+}
+
+func ContainsAll(l *List, tags []Tag) bool {
+	if len(l.Tags) == 0 {
+		return false
+	}
+
+	filter := toTagFilter(l.Tags)
+
+	for _, tag := range tags {
+		if _, ok := filter[tag]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func ContainsAny(l *List, tags []Tag) bool {
+	// repeating code
+	if len(l.Tags) == 0 {
+		return false
+	}
+
+	filter := toTagFilter(tags)
+
+	for _, tag := range l.Tags {
+		if _, ok := filter[tag]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func toTagFilter(tags []Tag) map[Tag]bool {
+	filter := make(map[Tag]bool)
+	for _, tag := range tags {
+		filter[tag] = true
+	}
+
+	return filter
+}
+
+type Tag string
+
+type TagsView struct {
+	View map[Tag][]ListTitle
+}
+
+// /  active -> ptr entries list active
+// /
+// /
+type ListTitle string
 
 type entryStatus uint8
 
@@ -42,11 +143,11 @@ func (es entryStatus) String() string {
 type List struct {
 	Title   ListTitle
 	Created time.Time
-	Tags    []string
+	Tags    []Tag
 	States  []*ListState
 }
 
-// t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
+// t.AppendHeader(table.Row{"Title", "Created",  "Started","Stopped", "Total Duration", "Session Duration", "Status"})
 func (l *List) AggregateAllRows() []interface{} {
 	last := l.States[len(l.States)-1]
 	var stopped, started, currentSession string
@@ -63,12 +164,24 @@ func (l *List) AggregateAllRows() []interface{} {
 	return []interface{}{
 		l.Title,
 		l.Created.Format(time.DateTime),
-		stopped,
 		started,
+		stopped,
 		last.TotalDuration.Truncate(time.Second).String(),
 		currentSession,
 		last.Status,
 	}
+}
+
+func (l *List) RemoveTag(t Tag) {
+	var tags []Tag
+
+	for _, tag := range l.Tags {
+		if tag != t {
+			tags = append(tags, tag)
+		}
+	}
+
+	l.Tags = tags
 }
 
 type ListState struct {
@@ -133,6 +246,10 @@ func (elist *EntriesLists) stopActive(title ListTitle, status entryStatus) {
 }
 
 func (elist *EntriesLists) RemoveByTitle(title ListTitle) {
+	for _, tag := range elist.EntriesListsView[title].Tags {
+		delete(elist.Tags.View, tag)
+	}
+
 	delete(elist.EntriesListsView, title)
 	if elist.CurrentActive == title {
 		elist.CurrentActive = ""
@@ -174,6 +291,11 @@ func (l *List) last() *ListState {
 	return l.States[len(l.States)-1]
 }
 
-// start taskname # creates new one or starts old one
-// stop (stops current running) # adds entry to currently runnning task
-//
+func InitEmptyElist() *EntriesLists {
+	return &EntriesLists{
+		EntriesListsView: make(map[ListTitle]*List),
+		Tags: TagsView{
+			View: make(map[Tag][]ListTitle),
+		},
+	}
+}

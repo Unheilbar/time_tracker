@@ -9,4 +9,9 @@ var (
 		Name:      "all",
 		Shorthand: "",
 	}
+
+	Tag = &pflag.Flag{
+		Name:      "tag",
+		Shorthand: "",
+	}
 )

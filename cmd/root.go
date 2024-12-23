@@ -93,6 +93,18 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(resumeCmd)
 
+	startCmd.Flags().StringP(
+		flags.Tag.Name,
+		flags.Tag.Shorthand,
+		"",
+		"--tag to attach tag to the task")
+
+	listCmd.Flags().StringP(
+		flags.Tag.Name,
+		flags.Tag.Shorthand,
+		"",
+		"--tag to filter by tag")
+
 	removeCmd.Flags().BoolP(
 		flags.All.Name,
 		flags.All.Shorthand,

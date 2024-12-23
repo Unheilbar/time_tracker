@@ -1,11 +1,13 @@
 package tracker
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/Unheilbar/time_tracker/internal/entities"
+	"github.com/Unheilbar/time_tracker/internal/flags"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 )
@@ -66,6 +68,11 @@ func (a *App) Start(cmd *cobra.Command, args []string) {
 	}
 
 	list.InsertEntry(title, entities.StatusActive)
+
+	tags := getTags(cmd)
+	for _, tag := range tags {
+		list.AddTag(tag, title)
+	}
 
 	err = a.repo.DumpList(list)
 	if err != nil {
@@ -136,25 +143,57 @@ func (a *App) List(cmd *cobra.Command, args []string) {
 		log.Fatal("failed to upload list from db")
 	}
 
-	renderAggregatedAll(list)
+	tags := getTags(cmd)
+
+	renderAggregatedAll(list, tags)
+}
+
+func getTags(cmd *cobra.Command) []entities.Tag {
+	tagsStr := cmd.Flags().Lookup(flags.Tag.Name).Value.String()
+	if len(tagsStr) == 0 {
+		return nil
+	}
+	tags := strings.Split(tagsStr, "#")
+	if len(tags) == 0 {
+		log.Fatal("No tags found. Make sure your tags start with #")
+	}
+	fmt.Println(tags)
+
+	var res []entities.Tag
+	for _, tag := range tags {
+		tag = strings.Trim(tag, " ")
+		tag = strings.ToLower(tag)
+
+		if strings.Contains(tag, " ") {
+			log.Fatalf("Wrong tag format %s. Make sure your tags start with # lie in #youidiot.", tag)
+		}
+
+		res = append(res, entities.Tag(fmt.Sprint("#", tag)))
+	}
+
+	return res
 }
 
 func getTitleByArgs(args []string) entities.ListTitle {
 	return entities.ListTitle(strings.Join(args, " "))
 }
 
-func renderAggregatedAll(list *entities.EntriesLists) {
+func renderAggregatedAll(list *entities.EntriesLists, tags []entities.Tag) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Title", "Created", "Stopped", "Started", "Total Duration", "Session Duration", "Status"})
+	t.AppendHeader(table.Row{"Title", "Created", "Started", "Stopped", "Total Duration", "Session Duration", "Status"})
 	t.AppendSeparator()
-	for title, entries := range list.EntriesListsView {
-		if title != list.CurrentActive {
+	var hasActive bool
+	for _, entries := range list.Filter(tags, entities.ContainsAll) {
+		if entries.Title != list.CurrentActive {
 			t.AppendRow(entries.AggregateAllRows())
 			t.AppendSeparator()
+		} else {
+			hasActive = true
 		}
 	}
-	if list.CurrentActive != "" {
+
+	if list.CurrentActive != "" && hasActive {
 		t.AppendRow(list.EntriesListsView[list.CurrentActive].AggregateAllRows())
 	}
 

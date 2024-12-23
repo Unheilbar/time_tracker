@@ -39,6 +39,7 @@ func (repo *Repository) LoadList() (*entities.EntriesLists, error) {
 
 	res := &entities.EntriesLists{
 		EntriesListsView: make(map[entities.ListTitle]*entities.List),
+		Tags:             entities.TagsView{View: make(map[entities.Tag][]entities.ListTitle)},
 	}
 
 	if err == badger.ErrKeyNotFound {
@@ -53,6 +54,7 @@ func (repo *Repository) LoadList() (*entities.EntriesLists, error) {
 
 	return res, nil
 }
+
 func (repo *Repository) DumpList(l *entities.EntriesLists) error {
 	enc, err := json.Marshal(l)
 	if err != nil {
