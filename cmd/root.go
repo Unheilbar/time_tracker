@@ -20,9 +20,10 @@ var rootCmd = &cobra.Command{
 }
 
 var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start starts timer for task",
-	Run:   app.Start,
+	Aliases: []string{"add", "new", "create"},
+	Use:     "start",
+	Short:   "Start starts timer for task",
+	Run:     app.Start,
 }
 
 var stopCmd = &cobra.Command{
@@ -32,9 +33,10 @@ var stopCmd = &cobra.Command{
 }
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List shows all active projects.",
-	Run:   app.List,
+	Use:     "list",
+	Aliases: []string{"ls", "show"},
+	Short:   "List shows all active projects.",
+	Run:     app.List,
 }
 
 var resumeCmd = &cobra.Command{
@@ -44,9 +46,10 @@ var resumeCmd = &cobra.Command{
 }
 
 var removeCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "Stops last activated task",
-	Run:   app.Remove,
+	Use:     "remove",
+	Aliases: []string{"rm", "del", "delete"},
+	Short:   "Stops last activated task",
+	Run:     app.Remove,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

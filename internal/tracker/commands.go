@@ -157,7 +157,6 @@ func getTags(cmd *cobra.Command) []entities.Tag {
 	if len(tags) == 0 {
 		log.Fatal("No tags found. Make sure your tags start with #")
 	}
-	fmt.Println(tags)
 
 	var res []entities.Tag
 	for _, tag := range tags {
