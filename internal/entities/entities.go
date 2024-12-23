@@ -3,6 +3,7 @@ package entities
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -141,13 +142,14 @@ func (es entryStatus) String() string {
 
 // This list state keep snapshots on the moment new entry appeared
 type List struct {
+	Id      uint64
 	Title   ListTitle
 	Created time.Time
 	Tags    []Tag
 	States  []*ListState
 }
 
-// t.AppendHeader(table.Row{"Title", "Created",  "Started","Stopped", "Total Duration", "Session Duration", "Status"})
+// t.AppendHeader(table.Row{"#","Title", "Created",  "Started","Stopped", "Total Duration", "Session Duration", "Status"})
 func (l *List) AggregateAllRows() []interface{} {
 	last := l.States[len(l.States)-1]
 	var stopped, started, currentSession string
@@ -162,7 +164,8 @@ func (l *List) AggregateAllRows() []interface{} {
 	}
 
 	return []interface{}{
-		l.Title,
+		//l.Id,
+		titleAggregate(l.Title),
 		l.Created.Format(time.DateTime),
 		started,
 		stopped,
@@ -170,6 +173,23 @@ func (l *List) AggregateAllRows() []interface{} {
 		currentSession,
 		last.Status,
 	}
+}
+
+func titleAggregate(title ListTitle) string {
+	words := strings.Split(string(title), " ")
+	var res string
+	trigger := 10
+	current := 0
+	for _, word := range words {
+		if current+len(word) > trigger {
+			current = 0
+			res += "\n"
+		}
+		res += word
+		res += " "
+		current += len(word)
+	}
+	return res
 }
 
 func (l *List) RemoveTag(t Tag) {
