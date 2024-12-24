@@ -180,7 +180,7 @@ func getTitleByArgs(args []string) entities.ListTitle {
 func renderAggregatedAll(list *entities.EntriesLists, tags []entities.Tag) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Title", "Created", "Started", "Stopped", "Total Duration", "Session Duration", "Status"})
+	t.AppendHeader(table.Row{"Title", "Created", "Started", "Stopped", "Total Duration", "Session Duration", "Status", "Tags"})
 	t.AppendSeparator()
 	var hasActive bool
 	for _, entries := range list.Filter(tags, entities.ContainsAll) {

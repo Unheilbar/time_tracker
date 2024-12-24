@@ -149,30 +149,48 @@ type List struct {
 	States  []*ListState
 }
 
+var timeShortFormat = "2006-01-02 \n 15:04:05"
+
 // t.AppendHeader(table.Row{"#","Title", "Created",  "Started","Stopped", "Total Duration", "Session Duration", "Status"})
 func (l *List) AggregateAllRows() []interface{} {
 	last := l.States[len(l.States)-1]
 	var stopped, started, currentSession string
 	var prev *ListState
-	started = last.Timestamp.Format(time.DateTime)
+	started = last.Timestamp.Format(timeShortFormat)
 	if len(l.States) < 2 || last.Status == StatusActive {
 		currentSession = time.Since(last.Timestamp).Truncate(time.Second).String()
 	} else {
 		prev = l.States[len(l.States)-2]
-		started = prev.Timestamp.Format(time.DateTime)
-		stopped = last.Timestamp.Format(time.DateTime)
+		started = prev.Timestamp.Format(timeShortFormat)
+		stopped = last.Timestamp.Format(timeShortFormat)
 	}
 
 	return []interface{}{
-		//l.Id,
 		titleAggregate(l.Title),
-		l.Created.Format(time.DateTime),
+		l.Created.Format(timeShortFormat),
 		started,
 		stopped,
 		last.TotalDuration.Truncate(time.Second).String(),
 		currentSession,
 		last.Status,
+		tagsAggregate(l.Tags),
 	}
+}
+
+func tagsAggregate(tgs []Tag) string {
+	var res []string
+	trigger := 10
+	current := 0
+	for _, t := range tgs {
+		if current+len(t) > trigger {
+			res = append(res, "\n")
+			current = 0
+		}
+		res = append(res, string(t))
+		current += len(t)
+	}
+
+	return strings.Join(res, "")
 }
 
 func titleAggregate(title ListTitle) string {
